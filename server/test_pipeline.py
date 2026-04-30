@@ -10,6 +10,8 @@ from storage import (
     DB_PATH,
     complete_search_job,
     create_search_job,
+    get_run,
+    get_signal,
     get_opportunity,
     get_opportunity_record,
     get_ai_job,
@@ -18,8 +20,10 @@ from storage import (
     list_ai_jobs,
     list_ai_reports,
     list_opportunities,
+    list_opportunity_signals,
     list_runs,
     list_search_jobs,
+    list_signals,
     list_sources,
     set_source_enabled,
     upsert_source,
@@ -232,6 +236,42 @@ def test_opportunity_and_report_queries() -> None:
     assert get_ai_report(report["id"])["id"] == report["id"]
 
 
+def test_run_signal_and_opportunity_signal_queries() -> None:
+    result = run_pipeline(
+        fetch=False,
+        sample_posts=[
+            {
+                "title": "Need AI invoice exception triage",
+                "content": "Finance teams waste hours on invoice exceptions. We would pay for a focused workflow.",
+                "url": "https://example.com/invoice-exception-triage",
+                "source": "sample",
+                "source_group": "sample",
+                "comments": 11,
+            }
+        ],
+        query="invoice",
+        persist=True,
+    )
+    run_id = result["metadata"]["run_id"]
+    opportunity_id = result["opportunities"][0]["opportunity_id"]
+    signal_id = result["opportunities"][0]["signal_id"]
+
+    run = get_run(run_id)
+    assert run is not None
+    assert run["id"] == run_id
+
+    listed = list_signals(query="invoice", limit=5)
+    assert listed["total"] >= 1
+    assert any(item["id"] == signal_id for item in listed["items"])
+
+    signal = get_signal(signal_id)
+    assert signal is not None
+    assert signal["raw"]["signal_id"] == signal_id
+
+    linked_signals = list_opportunity_signals(opportunity_id)
+    assert any(item["id"] == signal_id for item in linked_signals)
+
+
 if __name__ == "__main__":
     test_tech_redline()
     test_giant_alternative_is_opportunity()
@@ -243,4 +283,5 @@ if __name__ == "__main__":
     test_ai_job_lifecycle()
     test_ai_provider_defaults_to_local_and_parses_json()
     test_opportunity_and_report_queries()
+    test_run_signal_and_opportunity_signal_queries()
     print("All tests passed.")

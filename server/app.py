@@ -13,6 +13,8 @@ from storage import (
     complete_search_job,
     create_search_job,
     fail_search_job,
+    get_run,
+    get_signal,
     get_latest_ai_report,
     get_ai_report,
     get_ai_job,
@@ -22,8 +24,10 @@ from storage import (
     list_ai_jobs,
     list_ai_reports,
     list_opportunities,
+    list_opportunity_signals,
     list_runs,
     list_search_jobs,
+    list_signals,
     list_sources,
     set_source_enabled,
     upsert_source,
@@ -54,6 +58,33 @@ class AppHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/runs":
             self.send_json({"runs": list_runs()})
             return
+        if parsed.path.startswith("/api/runs/"):
+            run_id = parsed.path.removeprefix("/api/runs/").strip("/")
+            run = get_run(run_id)
+            if not run:
+                self.send_json({"error": "Run not found"}, status=404)
+                return
+            self.send_json({"run": run})
+            return
+        if parsed.path == "/api/signals":
+            query = parse_qs(parsed.query)
+            result = list_signals(
+                limit=parse_int(first_value(query.get("limit")), 50),
+                offset=parse_int(first_value(query.get("offset")), 0),
+                query=first_value(query.get("q")) or first_value(query.get("query")),
+                source=first_value(query.get("source")),
+                source_group=first_value(query.get("source_group")),
+            )
+            self.send_json({"signals": result["items"], "total": result["total"], "limit": result["limit"], "offset": result["offset"]})
+            return
+        if parsed.path.startswith("/api/signals/"):
+            signal_id = parsed.path.removeprefix("/api/signals/").strip("/")
+            signal = get_signal(signal_id)
+            if not signal:
+                self.send_json({"error": "Signal not found"}, status=404)
+                return
+            self.send_json({"signal": signal})
+            return
         if parsed.path == "/api/opportunities":
             query = parse_qs(parsed.query)
             result = list_opportunities(
@@ -64,6 +95,14 @@ class AppHandler(BaseHTTPRequestHandler):
                 source_group=first_value(query.get("source_group")),
             )
             self.send_json({"opportunities": result["items"], "total": result["total"], "limit": result["limit"], "offset": result["offset"]})
+            return
+        if parsed.path.startswith("/api/opportunities/") and parsed.path.endswith("/signals"):
+            opportunity_id = parsed.path.removeprefix("/api/opportunities/").removesuffix("/signals").strip("/")
+            opportunity = get_opportunity_record(opportunity_id)
+            if not opportunity:
+                self.send_json({"error": "Opportunity not found"}, status=404)
+                return
+            self.send_json({"opportunity_id": opportunity_id, "signals": list_opportunity_signals(opportunity_id)})
             return
         if parsed.path.startswith("/api/opportunities/"):
             opportunity_id = parsed.path.removeprefix("/api/opportunities/").strip("/")

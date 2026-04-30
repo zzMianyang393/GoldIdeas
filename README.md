@@ -52,8 +52,12 @@ py -3 server\demand_pipeline.py --limit 50
 GET  /api/status
 GET  /api/report
 GET  /api/runs
+GET  /api/runs/{id}
+GET  /api/signals
+GET  /api/signals/{id}
 GET  /api/opportunities
 GET  /api/opportunities/{id}
+GET  /api/opportunities/{id}/signals
 GET  /api/sources
 GET  /api/sources/{id}
 GET  /api/search-jobs
@@ -97,6 +101,14 @@ POST /api/ai/jobs
 ```text
 GET /api/opportunities?limit=50&offset=0&rating=green&q=dashboard&source_group=reddit
 ```
+
+`GET /api/signals` 支持原始信号查询：
+
+```text
+GET /api/signals?limit=50&offset=0&q=invoice&source=sample&source_group=sample
+```
+
+`GET /api/opportunities/{id}/signals` 可用于回溯一个机会关联的原始信号。
 
 `GET /api/ai/reports` 支持按 opportunity 和 report type 过滤：
 

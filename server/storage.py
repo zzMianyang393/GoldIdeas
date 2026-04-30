@@ -531,10 +531,84 @@ def list_runs(limit: int = 20) -> list[dict[str, Any]]:
     return [row_to_run(row) for row in rows]
 
 
+def get_run(run_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+    return row_to_run(row) if row else None
+
+
 def row_to_run(row: sqlite3.Row) -> dict[str, Any]:
     data = dict(row)
     data["parameters"] = loads(data.pop("parameters_json"), {})
     data["errors"] = loads(data.pop("errors_json"), [])
+    return data
+
+
+def list_signals(
+    limit: int = 50,
+    offset: int = 0,
+    query: str | None = None,
+    source: str | None = None,
+    source_group: str | None = None,
+) -> dict[str, Any]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if query:
+        clauses.append("(lower(title) LIKE ? OR lower(content) LIKE ?)")
+        value = f"%{query.lower()}%"
+        params.extend([value, value])
+    if source:
+        clauses.append("source = ?")
+        params.append(source)
+    if source_group:
+        clauses.append("source_group = ?")
+        params.append(source_group)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    with connect() as conn:
+        total_row = conn.execute(f"SELECT COUNT(*) AS count FROM signals {where}", tuple(params)).fetchone()
+        rows = conn.execute(
+            f"""
+            SELECT * FROM signals
+            {where}
+            ORDER BY fetched_at DESC, published_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            tuple(params + [limit, offset]),
+        ).fetchall()
+    return {
+        "items": [row_to_signal(row) for row in rows],
+        "total": int(total_row["count"] if total_row else 0),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+def get_signal(signal_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM signals WHERE id = ?", (signal_id,)).fetchone()
+    return row_to_signal(row) if row else None
+
+
+def list_opportunity_signals(opportunity_id: str) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT s.*, os.relation_type, os.confidence
+            FROM opportunity_signals os
+            JOIN signals s ON s.id = os.signal_id
+            WHERE os.opportunity_id = ?
+            ORDER BY os.confidence DESC, s.fetched_at DESC
+            """,
+            (opportunity_id,),
+        ).fetchall()
+    return [row_to_signal(row) for row in rows]
+
+
+def row_to_signal(row: sqlite3.Row) -> dict[str, Any]:
+    data = dict(row)
+    raw = loads(data.pop("raw_json"), {})
+    data["raw"] = raw if isinstance(raw, dict) else {}
     return data
 
 
