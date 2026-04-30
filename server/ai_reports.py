@@ -3,15 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from ai_providers import generate_report
 from demand_pipeline import stable_hash
 from storage import get_cached_ai_report, get_opportunity, save_ai_report
 
 
 REPORT_TYPE = "feasibility"
-PROMPT_VERSION = "local_stub_v1"
+PROMPT_VERSION = "provider_v1"
 TEMPLATE_VERSION = "feasibility_v1"
-MODEL = "local-rule-summary"
-PROVIDER = "local"
 
 
 def input_hash_for(opportunity: dict[str, Any], report_type: str = REPORT_TYPE) -> str:
@@ -39,24 +38,25 @@ def get_or_create_ai_report(opportunity_id: str, force: bool = False, report_typ
         cached["cache_hit"] = True
         return cached
 
-    report_json = build_stub_report(opportunity)
-    markdown = render_markdown_report(opportunity, report_json)
+    fallback_report = build_stub_report(opportunity)
+    fallback_markdown = render_markdown_report(opportunity, fallback_report)
+    provider_result = generate_report(opportunity, fallback_report, fallback_markdown)
     generated_at = datetime.now(timezone.utc).isoformat()
     report = {
         "id": f"air_{stable_hash(opportunity_id + report_type + input_hash, 24)}",
         "opportunity_id": opportunity_id,
         "report_type": report_type,
         "status": "completed",
-        "report_json": report_json,
-        "report_markdown": markdown,
-        "provider": PROVIDER,
-        "model": MODEL,
+        "report_json": provider_result.report_json,
+        "report_markdown": provider_result.report_markdown,
+        "provider": provider_result.provider,
+        "model": provider_result.model,
         "prompt_version": PROMPT_VERSION,
         "report_template_version": TEMPLATE_VERSION,
         "scoring_profile_version": "micro_saas_v4_1",
         "input_hash": input_hash,
-        "token_usage": 0,
-        "cost_estimate": 0,
+        "token_usage": provider_result.token_usage,
+        "cost_estimate": provider_result.cost_estimate,
         "created_at": generated_at,
         "generated_at": generated_at,
         "expires_at": "",

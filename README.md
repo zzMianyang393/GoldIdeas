@@ -108,6 +108,24 @@ POST /api/ai/jobs
 }
 ```
 
+AI provider 默认是零成本本地占位：
+
+```powershell
+$env:GOLDIDEAS_AI_PROVIDER='local'
+```
+
+如需接入 OpenAI-compatible Chat Completions 接口：
+
+```powershell
+$env:GOLDIDEAS_AI_PROVIDER='openai'
+$env:OPENAI_API_KEY='...'
+$env:OPENAI_MODEL='gpt-4o-mini'
+# 可选：兼容服务地址
+$env:OPENAI_BASE_URL='https://api.openai.com/v1'
+```
+
+真实 provider 会写入 `provider`、`model`、`token_usage` 字段；当前没有内置价格表，`cost_estimate` 暂为 0。
+
 `POST /api/search-jobs` 会创建搜索任务、同步执行扫描、记录任务状态，并返回本次 run 与 opportunity 结果。
 
 `POST /api/sources` 可创建或更新来源：

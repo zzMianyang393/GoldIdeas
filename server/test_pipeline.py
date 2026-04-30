@@ -1,8 +1,10 @@
 from pathlib import Path
 from time import sleep
+import os
 
 from ai_jobs import enqueue_ai_report_job
 from ai_reports import get_or_create_ai_report
+from ai_providers import parse_report_content
 from demand_pipeline import analyze_post, run_pipeline
 from storage import (
     DB_PATH,
@@ -192,6 +194,12 @@ def test_ai_job_lifecycle() -> None:
     assert any(item["id"] == job["id"] for item in list_ai_jobs(opportunity_id=opportunity_id))
 
 
+def test_ai_provider_defaults_to_local_and_parses_json() -> None:
+    os.environ.pop("GOLDIDEAS_AI_PROVIDER", None)
+    parsed = parse_report_content('{"executive_summary":{"recommendation":"validate"}}')
+    assert parsed["executive_summary"]["recommendation"] == "validate"
+
+
 if __name__ == "__main__":
     test_tech_redline()
     test_giant_alternative_is_opportunity()
@@ -201,4 +209,5 @@ if __name__ == "__main__":
     test_sources_can_be_managed()
     test_search_job_lifecycle()
     test_ai_job_lifecycle()
+    test_ai_provider_defaults_to_local_and_parses_json()
     print("All tests passed.")
