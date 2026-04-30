@@ -14,10 +14,14 @@ from storage import (
     create_search_job,
     fail_search_job,
     get_latest_ai_report,
+    get_ai_report,
     get_ai_job,
+    get_opportunity_record,
     get_search_job,
     get_source,
     list_ai_jobs,
+    list_ai_reports,
+    list_opportunities,
     list_runs,
     list_search_jobs,
     list_sources,
@@ -49,6 +53,25 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/runs":
             self.send_json({"runs": list_runs()})
+            return
+        if parsed.path == "/api/opportunities":
+            query = parse_qs(parsed.query)
+            result = list_opportunities(
+                limit=parse_int(first_value(query.get("limit")), 50),
+                offset=parse_int(first_value(query.get("offset")), 0),
+                rating=first_value(query.get("rating")),
+                query=first_value(query.get("q")) or first_value(query.get("query")),
+                source_group=first_value(query.get("source_group")),
+            )
+            self.send_json({"opportunities": result["items"], "total": result["total"], "limit": result["limit"], "offset": result["offset"]})
+            return
+        if parsed.path.startswith("/api/opportunities/"):
+            opportunity_id = parsed.path.removeprefix("/api/opportunities/").strip("/")
+            opportunity = get_opportunity_record(opportunity_id)
+            if not opportunity:
+                self.send_json({"error": "Opportunity not found"}, status=404)
+                return
+            self.send_json({"opportunity": opportunity})
             return
         if parsed.path == "/api/sources":
             query = parse_qs(parsed.query)
@@ -86,6 +109,26 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_json({"ready": False, "opportunity_id": opportunity_id})
                 return
             self.send_json({"ready": True, "report": report})
+            return
+        if parsed.path == "/api/ai/reports":
+            query = parse_qs(parsed.query)
+            self.send_json(
+                {
+                    "ai_reports": list_ai_reports(
+                        limit=parse_int(first_value(query.get("limit")), 20),
+                        opportunity_id=first_value(query.get("opportunity_id")),
+                        report_type=first_value(query.get("report_type")),
+                    )
+                }
+            )
+            return
+        if parsed.path.startswith("/api/ai/reports/"):
+            report_id = parsed.path.removeprefix("/api/ai/reports/").strip("/")
+            report = get_ai_report(report_id)
+            if not report:
+                self.send_json({"error": "AI report not found"}, status=404)
+                return
+            self.send_json({"report": report})
             return
         if parsed.path == "/api/ai/jobs":
             query = parse_qs(parsed.query)

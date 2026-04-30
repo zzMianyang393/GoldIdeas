@@ -52,11 +52,15 @@ py -3 server\demand_pipeline.py --limit 50
 GET  /api/status
 GET  /api/report
 GET  /api/runs
+GET  /api/opportunities
+GET  /api/opportunities/{id}
 GET  /api/sources
 GET  /api/sources/{id}
 GET  /api/search-jobs
 GET  /api/search-jobs/{id}
 GET  /api/ai/report?opportunity_id=opp_xxx
+GET  /api/ai/reports
+GET  /api/ai/reports/{id}
 GET  /api/ai/jobs
 GET  /api/ai/jobs/{id}
 POST /api/scan
@@ -87,6 +91,18 @@ POST /api/ai/jobs
 - `micro_saas`
 - `developer_tools`
 - `ecommerce_tools`
+
+`GET /api/opportunities` 支持列表查询：
+
+```text
+GET /api/opportunities?limit=50&offset=0&rating=green&q=dashboard&source_group=reddit
+```
+
+`GET /api/ai/reports` 支持按 opportunity 和 report type 过滤：
+
+```text
+GET /api/ai/reports?opportunity_id=opp_xxx&report_type=feasibility
+```
 
 `POST /api/ai/report` 会根据 `opportunity_id` 获取或生成可行性报告。当前实现是零 token 的本地占位报告，用于验证缓存、数据库和 API 流程；后续可以替换为真实 AI provider。
 
@@ -147,5 +163,5 @@ $env:OPENAI_BASE_URL='https://api.openai.com/v1'
 
 ```powershell
 py -3 server\test_pipeline.py
-py -3 -m py_compile server\demand_pipeline.py server\app.py server\storage.py server\ai_reports.py
+py -3 -m py_compile server\demand_pipeline.py server\app.py server\storage.py server\ai_reports.py server\ai_jobs.py server\ai_providers.py
 ```

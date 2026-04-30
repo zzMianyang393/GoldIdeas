@@ -856,6 +856,71 @@ def get_opportunity(opportunity_id: str) -> dict[str, Any] | None:
     return loads(row["latest_json"], None)
 
 
+def get_opportunity_record(opportunity_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM opportunities WHERE id = ?",
+            (opportunity_id,),
+        ).fetchone()
+    return row_to_opportunity(row) if row else None
+
+
+def list_opportunities(
+    limit: int = 50,
+    offset: int = 0,
+    rating: str | None = None,
+    query: str | None = None,
+    source_group: str | None = None,
+) -> dict[str, Any]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if rating:
+        clauses.append("lower(rating) LIKE ?")
+        params.append(f"%{rating.lower()}%")
+    if query:
+        clauses.append("(lower(title) LIKE ? OR lower(canonical_summary) LIKE ?)")
+        value = f"%{query.lower()}%"
+        params.extend([value, value])
+    if source_group:
+        clauses.append("source_group = ?")
+        params.append(source_group)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    with connect() as conn:
+        total_row = conn.execute(f"SELECT COUNT(*) AS count FROM opportunities {where}", tuple(params)).fetchone()
+        rows = conn.execute(
+            f"""
+            SELECT * FROM opportunities
+            {where}
+            ORDER BY total_score DESC, last_seen_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            tuple(params + [limit, offset]),
+        ).fetchall()
+    return {
+        "items": [row_to_opportunity(row) for row in rows],
+        "total": int(total_row["count"] if total_row else 0),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+def row_to_opportunity(row: sqlite3.Row) -> dict[str, Any]:
+    data = dict(row)
+    latest = loads(data.pop("latest_json"), {})
+    if isinstance(latest, dict):
+        latest.update(
+            {
+                "first_seen_at": data["first_seen_at"],
+                "last_seen_at": data["last_seen_at"],
+                "seen_count": data["seen_count"],
+                "status": data["status"],
+            }
+        )
+        return latest
+    return data
+
+
 def get_cached_ai_report(opportunity_id: str, report_type: str, input_hash: str) -> dict[str, Any] | None:
     with connect() as conn:
         row = conn.execute(
@@ -886,6 +951,39 @@ def get_latest_ai_report(opportunity_id: str, report_type: str = "feasibility") 
     if not row:
         return None
     return row_to_ai_report(row)
+
+
+def get_ai_report(report_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM ai_reports WHERE id = ?", (report_id,)).fetchone()
+    return row_to_ai_report(row) if row else None
+
+
+def list_ai_reports(
+    limit: int = 20,
+    opportunity_id: str | None = None,
+    report_type: str | None = None,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if opportunity_id:
+        clauses.append("opportunity_id = ?")
+        params.append(opportunity_id)
+    if report_type:
+        clauses.append("report_type = ?")
+        params.append(report_type)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with connect() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT * FROM ai_reports
+            {where}
+            ORDER BY generated_at DESC, created_at DESC
+            LIMIT ?
+            """,
+            tuple(params + [limit]),
+        ).fetchall()
+    return [row_to_ai_report(row) for row in rows]
 
 
 def save_ai_report(report: dict[str, Any]) -> dict[str, Any]:

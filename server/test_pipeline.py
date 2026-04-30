@@ -11,9 +11,13 @@ from storage import (
     complete_search_job,
     create_search_job,
     get_opportunity,
+    get_opportunity_record,
     get_ai_job,
+    get_ai_report,
     get_search_job,
     list_ai_jobs,
+    list_ai_reports,
+    list_opportunities,
     list_runs,
     list_search_jobs,
     list_sources,
@@ -200,6 +204,34 @@ def test_ai_provider_defaults_to_local_and_parses_json() -> None:
     assert parsed["executive_summary"]["recommendation"] == "validate"
 
 
+def test_opportunity_and_report_queries() -> None:
+    result = run_pipeline(
+        fetch=False,
+        sample_posts=[
+            {
+                "title": "Need a micro SaaS churn dashboard",
+                "content": "Churn analysis is painful. I would pay for a simple dashboard.",
+                "url": "https://example.com/churn-dashboard",
+                "source": "sample",
+                "source_group": "sample",
+                "comments": 9,
+            }
+        ],
+        query="dashboard",
+        persist=True,
+    )
+    opportunity_id = result["opportunities"][0]["opportunity_id"]
+    listed = list_opportunities(query="dashboard", limit=5)
+    assert listed["total"] >= 1
+    assert any(item["opportunity_id"] == opportunity_id for item in listed["items"])
+    assert get_opportunity_record(opportunity_id)["opportunity_id"] == opportunity_id
+
+    report = get_or_create_ai_report(opportunity_id, force=True)
+    reports = list_ai_reports(opportunity_id=opportunity_id)
+    assert any(item["id"] == report["id"] for item in reports)
+    assert get_ai_report(report["id"])["id"] == report["id"]
+
+
 if __name__ == "__main__":
     test_tech_redline()
     test_giant_alternative_is_opportunity()
@@ -210,4 +242,5 @@ if __name__ == "__main__":
     test_search_job_lifecycle()
     test_ai_job_lifecycle()
     test_ai_provider_defaults_to_local_and_parses_json()
+    test_opportunity_and_report_queries()
     print("All tests passed.")
