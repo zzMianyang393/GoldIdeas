@@ -1,5 +1,7 @@
 from pathlib import Path
+from time import sleep
 
+from ai_jobs import enqueue_ai_report_job
 from ai_reports import get_or_create_ai_report
 from demand_pipeline import analyze_post, run_pipeline
 from storage import (
@@ -7,7 +9,9 @@ from storage import (
     complete_search_job,
     create_search_job,
     get_opportunity,
+    get_ai_job,
     get_search_job,
+    list_ai_jobs,
     list_runs,
     list_search_jobs,
     list_sources,
@@ -156,6 +160,38 @@ def test_search_job_lifecycle() -> None:
     assert any(item["id"] == job["id"] for item in list_search_jobs())
 
 
+def test_ai_job_lifecycle() -> None:
+    result = run_pipeline(
+        fetch=False,
+        sample_posts=[
+            {
+                "title": "Need API changelog monitoring",
+                "content": "API changes break our workflow. We would pay monthly for alerts.",
+                "url": "https://example.com/api-changelog-monitoring",
+                "source": "sample",
+                "source_group": "sample",
+                "comments": 15,
+            }
+        ],
+        query="api",
+        opportunity_type="developer_tools",
+        persist=True,
+    )
+    opportunity_id = result["opportunities"][0]["opportunity_id"]
+    job = enqueue_ai_report_job(opportunity_id)
+    final_job = None
+    for _ in range(20):
+        current = get_ai_job(job["id"])
+        if current and current["status"] in {"completed", "failed"}:
+            final_job = current
+            break
+        sleep(0.05)
+    assert final_job is not None
+    assert final_job["status"] == "completed"
+    assert final_job["report_id"]
+    assert any(item["id"] == job["id"] for item in list_ai_jobs(opportunity_id=opportunity_id))
+
+
 if __name__ == "__main__":
     test_tech_redline()
     test_giant_alternative_is_opportunity()
@@ -164,4 +200,5 @@ if __name__ == "__main__":
     test_pipeline_persists_and_ai_report_is_cached()
     test_sources_can_be_managed()
     test_search_job_lifecycle()
+    test_ai_job_lifecycle()
     print("All tests passed.")

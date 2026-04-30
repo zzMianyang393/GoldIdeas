@@ -57,11 +57,14 @@ GET  /api/sources/{id}
 GET  /api/search-jobs
 GET  /api/search-jobs/{id}
 GET  /api/ai/report?opportunity_id=opp_xxx
+GET  /api/ai/jobs
+GET  /api/ai/jobs/{id}
 POST /api/scan
 POST /api/search-jobs
 POST /api/sources
 POST /api/sources/{id}
 POST /api/ai/report
+POST /api/ai/jobs
 ```
 
 `POST /api/scan` 支持自定义搜索参数：
@@ -86,6 +89,16 @@ POST /api/ai/report
 - `ecommerce_tools`
 
 `POST /api/ai/report` 会根据 `opportunity_id` 获取或生成可行性报告。当前实现是零 token 的本地占位报告，用于验证缓存、数据库和 API 流程；后续可以替换为真实 AI provider。
+
+```json
+{
+  "opportunity_id": "opp_xxx",
+  "report_type": "feasibility",
+  "force": false
+}
+```
+
+`POST /api/ai/jobs` 会创建异步 AI 报告任务，返回 `pending` 状态的 job；服务会在后台线程中生成或复用缓存报告。前端可轮询 `GET /api/ai/jobs/{id}` 查看状态。
 
 ```json
 {

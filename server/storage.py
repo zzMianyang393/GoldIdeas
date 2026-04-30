@@ -237,6 +237,22 @@ def init_db(conn: sqlite3.Connection) -> None:
             FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS ai_jobs (
+            id TEXT PRIMARY KEY,
+            opportunity_id TEXT NOT NULL,
+            report_type TEXT NOT NULL,
+            status TEXT NOT NULL,
+            force INTEGER NOT NULL DEFAULT 0,
+            input_hash TEXT,
+            report_id TEXT,
+            error TEXT NOT NULL DEFAULT '',
+            parameters_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            completed_at TEXT,
+            FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS search_jobs (
             id TEXT PRIMARY KEY,
             query TEXT,
@@ -706,6 +722,126 @@ def row_to_search_job(row: sqlite3.Row) -> dict[str, Any]:
     data = dict(row)
     data["parameters"] = loads(data.pop("parameters_json"), {})
     data["result_counts"] = loads(data.pop("result_counts_json", "{}"), {})
+    return data
+
+
+def create_ai_job(
+    opportunity_id: str,
+    report_type: str = "feasibility",
+    force: bool = False,
+    parameters: dict[str, Any] | None = None,
+    input_hash: str | None = None,
+) -> dict[str, Any]:
+    from demand_pipeline import stable_hash
+
+    timestamp = now_iso()
+    seed = dumps(
+        {
+            "ts": timestamp,
+            "opportunity_id": opportunity_id,
+            "report_type": report_type,
+            "force": force,
+            "input_hash": input_hash or "",
+        }
+    )
+    job_id = f"aij_{stable_hash(seed, 20)}"
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO ai_jobs (
+                id, opportunity_id, report_type, status, force, input_hash,
+                report_id, error, parameters_json, created_at, started_at, completed_at
+            ) VALUES (?, ?, ?, 'pending', ?, ?, '', '', ?, ?, '', '')
+            """,
+            (
+                job_id,
+                opportunity_id,
+                report_type,
+                1 if force else 0,
+                input_hash or "",
+                dumps(parameters or {}),
+                timestamp,
+            ),
+        )
+        conn.commit()
+    job = get_ai_job(job_id)
+    if not job:
+        raise RuntimeError("Failed to create AI job")
+    return job
+
+
+def mark_ai_job_running(job_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        conn.execute(
+            "UPDATE ai_jobs SET status = 'running', started_at = ? WHERE id = ?",
+            (now_iso(), job_id),
+        )
+        conn.commit()
+    return get_ai_job(job_id)
+
+
+def complete_ai_job(job_id: str, report: dict[str, Any]) -> dict[str, Any] | None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE ai_jobs
+            SET status = 'completed',
+                input_hash = ?,
+                report_id = ?,
+                error = '',
+                completed_at = ?
+            WHERE id = ?
+            """,
+            (
+                report.get("input_hash") or "",
+                report.get("id") or "",
+                now_iso(),
+                job_id,
+            ),
+        )
+        conn.commit()
+    return get_ai_job(job_id)
+
+
+def fail_ai_job(job_id: str, message: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        conn.execute(
+            """
+            UPDATE ai_jobs
+            SET status = 'failed',
+                error = ?,
+                completed_at = ?
+            WHERE id = ?
+            """,
+            (message, now_iso(), job_id),
+        )
+        conn.commit()
+    return get_ai_job(job_id)
+
+
+def get_ai_job(job_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM ai_jobs WHERE id = ?", (job_id,)).fetchone()
+    return row_to_ai_job(row) if row else None
+
+
+def list_ai_jobs(limit: int = 20, opportunity_id: str | None = None) -> list[dict[str, Any]]:
+    params: list[Any] = []
+    query = "SELECT * FROM ai_jobs"
+    if opportunity_id:
+        query += " WHERE opportunity_id = ?"
+        params.append(opportunity_id)
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    with connect() as conn:
+        rows = conn.execute(query, tuple(params)).fetchall()
+    return [row_to_ai_job(row) for row in rows]
+
+
+def row_to_ai_job(row: sqlite3.Row) -> dict[str, Any]:
+    data = dict(row)
+    data["force"] = bool(data["force"])
+    data["parameters"] = loads(data.pop("parameters_json"), {})
     return data
 
 

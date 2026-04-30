@@ -7,14 +7,17 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from demand_pipeline import DATA_DIR, run_pipeline
+from ai_jobs import enqueue_ai_report_job
 from ai_reports import get_or_create_ai_report
 from storage import (
     complete_search_job,
     create_search_job,
     fail_search_job,
     get_latest_ai_report,
+    get_ai_job,
     get_search_job,
     get_source,
+    list_ai_jobs,
     list_runs,
     list_search_jobs,
     list_sources,
@@ -84,6 +87,25 @@ class AppHandler(BaseHTTPRequestHandler):
                 return
             self.send_json({"ready": True, "report": report})
             return
+        if parsed.path == "/api/ai/jobs":
+            query = parse_qs(parsed.query)
+            self.send_json(
+                {
+                    "ai_jobs": list_ai_jobs(
+                        limit=parse_int(first_value(query.get("limit")), 20),
+                        opportunity_id=first_value(query.get("opportunity_id")),
+                    )
+                }
+            )
+            return
+        if parsed.path.startswith("/api/ai/jobs/"):
+            job_id = parsed.path.removeprefix("/api/ai/jobs/").strip("/")
+            job = get_ai_job(job_id)
+            if not job:
+                self.send_json({"error": "AI job not found"}, status=404)
+                return
+            self.send_json({"ai_job": job})
+            return
         self.serve_static(parsed.path)
 
     def do_POST(self) -> None:
@@ -141,6 +163,24 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(exc)}, status=404)
                 return
             self.send_json({"ready": True, "report": report})
+            return
+        if parsed.path == "/api/ai/jobs":
+            payload = self.read_json()
+            opportunity_id = payload.get("opportunity_id") or payload.get("id")
+            if not opportunity_id:
+                self.send_json({"error": "Missing opportunity_id"}, status=400)
+                return
+            try:
+                job = enqueue_ai_report_job(
+                    opportunity_id,
+                    report_type=payload.get("report_type") or "feasibility",
+                    force=bool(payload.get("force")),
+                    parameters=payload,
+                )
+            except ValueError as exc:
+                self.send_json({"error": str(exc)}, status=404)
+                return
+            self.send_json({"ready": True, "ai_job": job}, status=202)
             return
         else:
             self.send_error(404)
