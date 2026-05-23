@@ -47,6 +47,7 @@ from storage import (
 
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT.parent / "web"
+STATIC_DIR = WEB_DIR / "dist" if (WEB_DIR / "dist" / "index.html").exists() else WEB_DIR
 HOST = os.getenv("GOLDIDEAS_HOST", "127.0.0.1")
 PORT = int(os.getenv("GOLDIDEAS_PORT", "8765"))
 
@@ -354,13 +355,13 @@ class AppHandler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def serve_static(self, path: str) -> None:
-        target = WEB_DIR / (path.lstrip("/") or "index.html")
+        target = STATIC_DIR / (path.lstrip("/") or "index.html")
         public_target = WEB_DIR / "public" / path.lstrip("/")
         if target.is_dir():
             target = target / "index.html"
         try:
             resolved = target.resolve()
-            resolved.relative_to(WEB_DIR.resolve())
+            resolved.relative_to(STATIC_DIR.resolve())
         except ValueError:
             self.send_error(403)
             return
@@ -374,7 +375,7 @@ class AppHandler(BaseHTTPRequestHandler):
             if public_resolved.exists():
                 resolved = public_resolved
             elif "." not in Path(path).name:
-                resolved = WEB_DIR / "index.html"
+                resolved = STATIC_DIR / "index.html"
             else:
                 self.send_error(404)
                 return

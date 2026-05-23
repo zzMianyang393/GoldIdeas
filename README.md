@@ -120,6 +120,56 @@ http://127.0.0.1:5180
 
 The Vite dev server proxies `/api` requests to the backend.
 
+## Build A Server Package
+
+Create a deployable zip locally:
+
+```powershell
+.\scripts\package.cmd
+```
+
+Output:
+
+```text
+release/goldideas-release.zip
+```
+
+The package contains:
+
+- Python backend
+- Prebuilt frontend in `web/dist`
+- Linux and Windows server start scripts
+- Deployment notes
+
+It does not include `.venv`, `node_modules`, git data, or runtime data.
+
+## GitHub Artifact
+
+Every push to `main` runs `.github/workflows/package.yml` and uploads:
+
+```text
+goldideas-release.zip
+```
+
+You can download it from the GitHub Actions run artifacts.
+
+If you create a tag like `v0.1.0`, the workflow also attaches the zip to the GitHub Release:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Then a server can download:
+
+```bash
+wget https://github.com/zzMianyang393/GoldIdeas/releases/latest/download/goldideas-release.zip
+unzip goldideas-release.zip
+cd goldideas-release
+chmod +x run-server.sh
+GOLDIDEAS_PUBLIC_BASE_URL=https://your-domain.com ./run-server.sh
+```
+
 ## Useful Public Discovery URLs
 
 When the backend is running:
