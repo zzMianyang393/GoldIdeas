@@ -573,20 +573,32 @@ def fetch_configured_sources(limit: int, queries: list[str] | None = None, sourc
 
 
 def post_matches_search(post: dict[str, Any], query: str | None, include_keywords: list[str] | None = None, exclude_keywords: list[str] | None = None) -> bool:
-    text = text_of(post)
-    if query and normalize_text(query) not in normalize_text(text):
-        query_terms = [term for term in normalize_text(query).split(" ") if len(term) > 2]
-        if query_terms and not any(term in normalize_text(text) for term in query_terms):
+    normalized = normalize_text(text_of(post))
+    query_terms = keyword_terms(query)
+    include_terms = []
+    for keyword in include_keywords or []:
+        include_terms.extend(keyword_terms(keyword))
+
+    if query_terms:
+        matched_terms = [term for term in query_terms if term in normalized]
+        required_matches = min(2, len(query_terms))
+        if len(matched_terms) < required_matches:
             return False
     if include_keywords:
-        normalized = normalize_text(text)
-        if not any(normalize_text(keyword) in normalized for keyword in include_keywords if keyword):
+        include_phrases = [normalize_text(keyword) for keyword in include_keywords if normalize_text(keyword)]
+        if not any(phrase in normalized for phrase in include_phrases) and not any(term in normalized for term in include_terms):
             return False
     if exclude_keywords:
-        normalized = normalize_text(text)
         if any(normalize_text(keyword) in normalized for keyword in exclude_keywords if keyword):
             return False
     return True
+
+
+def keyword_terms(value: str | None) -> list[str]:
+    normalized = normalize_text(value)
+    if not normalized:
+        return []
+    return [term for term in normalized.split(" ") if len(term) > 2]
 
 
 def text_of(post: dict[str, Any]) -> str:

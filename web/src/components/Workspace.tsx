@@ -147,16 +147,22 @@ const Workspace: React.FC<WorkspaceProps> = ({ activeModule, selectedItem, setSe
 
   const handleScan = async (event?: React.FormEvent) => {
     event?.preventDefault();
+    const normalizedQuery = query.trim();
+    const parsedInclude = parseKeywordList(includeKeywords);
+    if (!normalizedQuery && parsedInclude.length === 0) {
+      setError('Enter an idea or include keyword before scanning. Empty scans return noisy source data.');
+      return;
+    }
     setIsScanning(true);
     setError('');
     setSelectedItem(null);
     try {
       const result = await runScan({
-        query: query.trim() || undefined,
+        query: normalizedQuery || undefined,
         opportunity_type: opportunityType,
         limit: 12,
         quick: true,
-        include_keywords: parseKeywordList(includeKeywords),
+        include_keywords: parsedInclude,
         exclude_keywords: parseKeywordList(excludeKeywords),
         ai_depth: 'none',
       });
@@ -186,10 +192,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ activeModule, selectedItem, setSe
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="e.g. Shopify returns automation"
+                  placeholder="Required: e.g. Shopify returns automation"
                   data-testid="scan-query"
                 />
               </div>
+              <small className="scan-help">Use a concrete pain or market. Empty scans are blocked to avoid noisy source results.</small>
             </label>
             <label className="scan-field">
               <span>Opportunity type</span>

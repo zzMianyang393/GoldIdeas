@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, ExternalLink, Activity, FileText, Target, Link2, Loader2, Quote } from 'lucide-react';
+import { X, ExternalLink, Activity, FileText, Target, Link2, Loader2, Quote, Maximize2, Minimize2 } from 'lucide-react';
 import { createAiReport, getOpportunityId, listOpportunitySignals, slugifyOpportunity } from '../api';
 import type { AiReport, Opportunity, Signal } from '../api';
 import './Inspector.css';
@@ -29,6 +29,7 @@ const Inspector: React.FC<InspectorProps> = ({ item, activeModule, onClose, t })
   const [report, setReport] = useState<AiReport | null>(null);
   const [isLoadingSignals, setIsLoadingSignals] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [error, setError] = useState('');
   const opportunityId = getOpportunityId(item);
   const publicPath = `/opportunities/${slugifyOpportunity(item.title || opportunityId || 'opportunity')}`;
@@ -86,13 +87,23 @@ const Inspector: React.FC<InspectorProps> = ({ item, activeModule, onClose, t })
   }
 
   return (
-    <aside className="inspector glass-panel animate-fade-in">
+    <aside className={`inspector glass-panel animate-fade-in ${isExpanded ? 'expanded' : ''}`}>
       <div className="inspector-header">
         <div className="inspector-header-top">
           <h3 className="outfit-font">{t('optDetail')}</h3>
-          <button className="btn-close" onClick={onClose} aria-label="Close opportunity detail">
-            <X size={18} />
-          </button>
+          <div className="inspector-tools">
+            <button
+              className="btn-close"
+              onClick={() => setIsExpanded((value) => !value)}
+              aria-label={isExpanded ? 'Collapse detail panel' : 'Expand detail panel'}
+              title={isExpanded ? 'Collapse detail panel' : 'Expand detail panel'}
+            >
+              {isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            </button>
+            <button className="btn-close" onClick={onClose} aria-label="Close opportunity detail">
+              <X size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -186,15 +197,25 @@ const Inspector: React.FC<InspectorProps> = ({ item, activeModule, onClose, t })
             <p className="muted-text">No linked source evidence found yet. Run a scan first.</p>
           )}
           <div className="evidence-list">
-            {signals.slice(0, 5).map((signal) => (
+            {signals.slice(0, 12).map((signal) => (
               <article className="evidence-card" key={signal.id}>
                 <div className="evidence-meta">
                   <span>{signal.source || signal.source_group}</span>
                   {signal.published_at && <span>{new Date(signal.published_at).toLocaleDateString()}</span>}
                 </div>
                 <h5>{signal.title}</h5>
-                {signal.content && <p><Quote size={12} /> {signal.content}</p>}
-                {signal.url && <a href={signal.url} target="_blank" rel="noreferrer">Open evidence</a>}
+                {signal.content && (
+                  <p>
+                    <Quote size={12} />
+                    {signal.content}
+                  </p>
+                )}
+                <div className="evidence-actions">
+                  {signal.url && <a href={signal.url} target="_blank" rel="noreferrer">Open evidence</a>}
+                  {signal.comments_url && signal.comments_url !== signal.url && (
+                    <a href={signal.comments_url} target="_blank" rel="noreferrer">Open discussion</a>
+                  )}
+                </div>
               </article>
             ))}
           </div>

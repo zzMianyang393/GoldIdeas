@@ -246,11 +246,19 @@ class AppHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/scan":
             payload = self.read_json()
+            validation_error = validate_scan_payload(payload)
+            if validation_error:
+                self.send_json({"error": validation_error}, status=400)
+                return
             result = run_scan_from_payload(payload)
             self.send_json(slim_result(result))
             return
         if parsed.path == "/api/search-jobs":
             payload = self.read_json()
+            validation_error = validate_scan_payload(payload)
+            if validation_error:
+                self.send_json({"error": validation_error}, status=400)
+                return
             job = create_search_job(normalize_scan_payload(payload), status="running")
             try:
                 result = run_scan_from_payload(payload, search_job_id=job["id"])
@@ -779,6 +787,15 @@ def parse_int(value: str | None, default: int) -> int:
         return int(value or default)
     except (TypeError, ValueError):
         return default
+
+
+def validate_scan_payload(payload: dict) -> str | None:
+    query = (payload.get("query") or "").strip()
+    include_keywords = payload.get("include_keywords") or []
+    include_terms = [item.strip() for item in include_keywords if isinstance(item, str) and item.strip()]
+    if not query and not include_terms:
+        return "Enter an idea, market, or include keyword before scanning."
+    return None
 
 
 def normalize_scan_payload(payload: dict) -> dict:

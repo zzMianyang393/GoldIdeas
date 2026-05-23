@@ -82,6 +82,12 @@
   letter-spacing: 0.05em;
 }
 
+.scan-help {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
 .scan-field input,
 .scan-field select,
 .input-with-icon {

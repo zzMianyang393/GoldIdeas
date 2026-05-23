@@ -5,8 +5,9 @@ import os
 from ai_jobs import enqueue_ai_report_job
 from ai_reports import get_or_create_ai_report
 from ai_providers import parse_report_content
-from app import build_llms_txt, build_opportunities_rss, build_robots_txt, build_sitemap, metadata_for_path, public_base_url, public_opportunity_feed, public_opportunity_markdown, waitlist_csv
+from app import build_llms_txt, build_opportunities_rss, build_robots_txt, build_sitemap, metadata_for_path, public_base_url, public_opportunity_feed, public_opportunity_markdown, validate_scan_payload, waitlist_csv
 from demand_pipeline import analyze_post, analyze_posts, run_pipeline
+from demand_pipeline import post_matches_search
 from storage import (
     DB_PATH,
     complete_search_job,
@@ -125,6 +126,21 @@ def test_related_posts_are_clustered() -> None:
     assert len(opportunities) == 1
     assert opportunities[0]["evidence_count"] == 2
     assert len(opportunities[0]["representative_signals"]) == 2
+
+
+def test_search_filter_requires_relevant_terms() -> None:
+    unrelated = {
+        "title": "Peak unemployment for a software engineer",
+        "content": "Career update about job search and interviews.",
+    }
+    related = {
+        "title": "Need Shopify returns automation",
+        "content": "Refund status updates and return labels waste time.",
+    }
+    assert post_matches_search(unrelated, "shopify returns automation", include_keywords=["returns", "refund"]) is False
+    assert post_matches_search(related, "shopify returns automation", include_keywords=["returns", "refund"]) is True
+    assert validate_scan_payload({"query": "", "include_keywords": []}) is not None
+    assert validate_scan_payload({"query": "shopify returns", "include_keywords": []}) is None
 
 
 def test_pipeline_persists_and_ai_report_is_cached() -> None:
@@ -374,6 +390,7 @@ if __name__ == "__main__":
     test_fake_question_without_pain_is_red()
     test_fingerprint_is_stable()
     test_related_posts_are_clustered()
+    test_search_filter_requires_relevant_terms()
     test_pipeline_persists_and_ai_report_is_cached()
     test_sources_can_be_managed()
     test_search_job_lifecycle()
