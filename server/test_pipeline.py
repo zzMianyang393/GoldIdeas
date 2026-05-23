@@ -5,11 +5,13 @@ import os
 from ai_jobs import enqueue_ai_report_job
 from ai_reports import get_or_create_ai_report
 from ai_providers import parse_report_content
-from demand_pipeline import analyze_post, run_pipeline
+from app import build_llms_txt, build_opportunities_rss, build_robots_txt, build_sitemap, metadata_for_path, public_base_url, public_opportunity_feed, public_opportunity_markdown, waitlist_csv
+from demand_pipeline import analyze_post, analyze_posts, run_pipeline
 from storage import (
     DB_PATH,
     complete_search_job,
     create_search_job,
+    create_waitlist_signup,
     get_run,
     get_signal,
     get_opportunity,
@@ -25,8 +27,10 @@ from storage import (
     list_search_jobs,
     list_signals,
     list_sources,
+    list_waitlist_signups,
     set_source_enabled,
     upsert_source,
+    waitlist_stats,
 )
 
 
@@ -96,6 +100,33 @@ def test_fingerprint_is_stable() -> None:
     assert first["signal_id"] == second["signal_id"]
 
 
+def test_related_posts_are_clustered() -> None:
+    opportunities = analyze_posts(
+        [
+            {
+                "title": "Looking for a Shopify returns automation tool",
+                "content": "Returns waste time. I would pay monthly for a focused returns automation tool.",
+                "url": "https://example.com/shopify-returns-1",
+                "source": "sample-a",
+                "source_group": "sample",
+                "comments": 14,
+            },
+            {
+                "title": "Need Shopify refund and returns automation",
+                "content": "Manual returns and refund status updates are painful for our store.",
+                "url": "https://example.com/shopify-returns-2",
+                "source": "sample-b",
+                "source_group": "sample",
+                "comments": 7,
+            },
+        ],
+        opportunity_type="ecommerce_tools",
+    )
+    assert len(opportunities) == 1
+    assert opportunities[0]["evidence_count"] == 2
+    assert len(opportunities[0]["representative_signals"]) == 2
+
+
 def test_pipeline_persists_and_ai_report_is_cached() -> None:
     result = run_pipeline(
         fetch=False,
@@ -122,6 +153,8 @@ def test_pipeline_persists_and_ai_report_is_cached() -> None:
     second = get_or_create_ai_report(opportunity_id)
     assert first["input_hash"] == second["input_hash"]
     assert second["cache_hit"] is True
+    assert first["report_json"]["executive_summary"]["verdict"] in {"GO", "PIVOT", "KILL"}
+    assert "Problem Evidence" in first["report_markdown"]
 
 
 def test_sources_can_be_managed() -> None:
@@ -168,6 +201,66 @@ def test_search_job_lifecycle() -> None:
     assert completed["run_id"] == result["metadata"]["run_id"]
     assert get_search_job(job["id"])["result_counts"]
     assert any(item["id"] == job["id"] for item in list_search_jobs())
+
+
+def test_waitlist_signup_and_public_feed() -> None:
+    result = run_pipeline(
+        fetch=False,
+        sample_posts=[
+            {
+                "title": "Need Shopify returns automation reports",
+                "content": "Returns waste time and I would pay for automation.",
+                "url": "https://example.com/returns-report",
+                "source": "sample",
+                "source_group": "sample",
+                "comments": 8,
+            }
+        ],
+        query="returns",
+        opportunity_type="ecommerce_tools",
+        persist=True,
+    )
+    opportunity_id = result["opportunities"][0]["opportunity_id"]
+    signup = create_waitlist_signup(
+        {
+            "email": "founder@example.com",
+            "public_slug": "need-shopify-returns-automation-reports",
+            "query": "shopify returns automation",
+            "opportunity_id": opportunity_id,
+            "utm": {"source": "test"},
+        }
+    )
+    assert signup["email"] == "founder@example.com"
+    try:
+        create_waitlist_signup({"email": "bot@example.com", "public_slug": "bot", "company_name": "Filled by script"})
+        assert False
+    except ValueError:
+        pass
+    assert any(item["id"] == signup["id"] for item in list_waitlist_signups())
+    feed = public_opportunity_feed()
+    assert any(item["id"] == opportunity_id for item in feed)
+    assert all(item["url"].startswith(public_base_url()) for item in feed)
+    assert all(item["markdown_url"].endswith(".md") for item in feed)
+    assert any(item["lead_count"] >= 1 for item in feed if item["id"] == opportunity_id)
+    assert "/opportunities/" in build_sitemap()
+    assert "/opportunities.xml" in build_sitemap()
+    assert ".md" in build_sitemap()
+    assert "<rss" in build_opportunities_rss()
+    assert "GoldIdeas Public Opportunities" in build_opportunities_rss()
+    assert "<pubDate>" in build_opportunities_rss()
+    assert "Sitemap:" in build_robots_txt()
+    assert "Public opportunity feed" in build_llms_txt()
+    markdown = public_opportunity_markdown("need-shopify-returns-automation-reports")
+    assert markdown and "## Evidence Signals" in markdown
+    csv_text = waitlist_csv()
+    assert "founder@example.com" in csv_text
+    assert "need-shopify-returns-automation-reports" in csv_text
+    stats = waitlist_stats()
+    assert stats["total"] >= 1
+    assert stats["by_slug"][0]["count"] >= 1
+    meta = metadata_for_path("/opportunities/shopify-returns-automation")
+    assert meta["type"] == "article"
+    assert "GoldIdeas" in meta["title"]
 
 
 def test_ai_job_lifecycle() -> None:
@@ -231,6 +324,9 @@ def test_opportunity_and_report_queries() -> None:
     assert get_opportunity_record(opportunity_id)["opportunity_id"] == opportunity_id
 
     report = get_or_create_ai_report(opportunity_id, force=True)
+    assert "executive_summary" in report["report_json"]
+    assert "problem_evidence" in report["report_json"]
+    assert "validation_plan" in report["report_json"]
     reports = list_ai_reports(opportunity_id=opportunity_id)
     assert any(item["id"] == report["id"] for item in reports)
     assert get_ai_report(report["id"])["id"] == report["id"]
@@ -277,9 +373,11 @@ if __name__ == "__main__":
     test_giant_alternative_is_opportunity()
     test_fake_question_without_pain_is_red()
     test_fingerprint_is_stable()
+    test_related_posts_are_clustered()
     test_pipeline_persists_and_ai_report_is_cached()
     test_sources_can_be_managed()
     test_search_job_lifecycle()
+    test_waitlist_signup_and_public_feed()
     test_ai_job_lifecycle()
     test_ai_provider_defaults_to_local_and_parses_json()
     test_opportunity_and_report_queries()

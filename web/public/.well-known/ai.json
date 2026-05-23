@@ -1,0 +1,40 @@
+{
+  "name": "GoldIdeas",
+  "description": "Source-backed SaaS opportunity validation workspace.",
+  "entrypoints": {
+    "llmsTxt": "/llms.txt",
+    "sitemap": "/sitemap.xml",
+    "rss": "/opportunities.xml",
+    "publicOpportunityFeed": "/public-opportunities.json",
+    "publicOpportunityPattern": "/opportunities/{slug}",
+    "api": {
+      "listOpportunities": "/api/opportunities?limit=50&q={query}",
+      "runScan": "/api/scan",
+      "createReport": "/api/ai/report",
+      "joinWaitlist": "/api/waitlist"
+    }
+  },
+  "actions": [
+    {
+      "name": "Validate an idea",
+      "method": "POST",
+      "path": "/api/scan",
+      "body": {
+        "query": "string",
+        "opportunity_type": "micro_saas | developer_tools | ecommerce_tools",
+        "quick": true
+      }
+    },
+    {
+      "name": "Request a private report",
+      "method": "POST",
+      "path": "/api/waitlist",
+      "body": {
+        "email": "string",
+        "public_slug": "string",
+        "query": "string",
+        "source": "ai_agent"
+      }
+    }
+  ]
+}

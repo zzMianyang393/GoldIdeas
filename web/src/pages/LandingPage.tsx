@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowRight, Globe, Database, Activity, Shield, Terminal, ArrowUpRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, Globe, Database, Shield, Search, CheckCircle2, GitBranch, Radar } from 'lucide-react';
 import type { Language } from '../i18n';
 import { useTranslation } from '../i18n';
 import './LandingPage.css';
@@ -8,11 +8,18 @@ interface LandingPageProps {
   language: Language;
   onLanguageChange: (lang: Language) => void;
   onNavigate: (view: 'dashboard') => void;
+  onStartValidation: (query: string) => void;
   isLoggedIn: boolean;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ language, onLanguageChange, onNavigate, isLoggedIn }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ language, onLanguageChange, onNavigate, onStartValidation, isLoggedIn }) => {
   const t = useTranslation(language);
+  const [query, setQuery] = useState('Shopify returns automation');
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onStartValidation(query.trim());
+  };
 
   return (
     <div className="landing-container">
@@ -43,7 +50,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ language, onLanguageChange, o
             ) : (
               <>
                 <button className="ghost-btn">{t('login')}</button>
-                <button className="primary-btn" onClick={() => onNavigate('dashboard')}>{t('register')}</button>
+                <button className="primary-btn" onClick={() => onStartValidation(query)}>{t('register')}</button>
               </>
             )}
           </div>
@@ -53,7 +60,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ language, onLanguageChange, o
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-badge">
-          <Terminal size={14} />
+          <Radar size={14} />
           <span>{t('heroBadge')}</span>
         </div>
         
@@ -67,39 +74,54 @@ const LandingPage: React.FC<LandingPageProps> = ({ language, onLanguageChange, o
           {t('heroDesc')}
         </p>
 
-        <div className="hero-cta">
-          <button className="cta-primary" onClick={() => onNavigate('dashboard')}>
-            {t('getStarted')}
-            <ArrowRight size={16} />
-          </button>
-          <button className="cta-secondary">
-            {t('viewDemo')}
-            <ArrowUpRight size={16} />
-          </button>
-        </div>
+        <form className="hero-validation-form" onSubmit={handleSubmit} data-testid="hero-validation-form">
+          <label htmlFor="landing-query">{t('ideaInputLabel')}</label>
+          <div className="hero-input-row">
+            <Search size={18} />
+            <input
+              id="landing-query"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('ideaInputPlaceholder')}
+              data-testid="landing-query"
+            />
+            <button type="submit" className="cta-primary" data-testid="start-validation">
+              {t('getStarted')}
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </form>
 
-        {/* Dashboard Preview Mockup */}
-        <div className="dashboard-mockup">
-          <div className="mockup-header">
-            <div className="mockup-dots">
-              <span></span><span></span><span></span>
+        <div className="sample-report">
+          <div className="sample-report-header">
+            <div>
+              <span className="sample-kicker">Sample validation report</span>
+              <h3>Shopify returns automation</h3>
             </div>
-            <div className="mockup-url">app.goldideas.io/workspace</div>
+            <span className="verdict-pill">GO</span>
           </div>
-          <div className="mockup-body">
-            <div className="mockup-sidebar"></div>
-            <div className="mockup-content">
-              <div className="mockup-row skeleton"></div>
-              <div className="mockup-row skeleton-light"></div>
-              <div className="mockup-row skeleton-light"></div>
-              <div className="mockup-row skeleton-light"></div>
+          <div className="sample-grid">
+            <div className="sample-cell">
+              <span>Evidence</span>
+              <strong>18 signals</strong>
+              <p>Repeated complaints around manual refunds, return labels, and customer status updates.</p>
             </div>
-            <div className="mockup-inspector">
-              <div className="mockup-circle"></div>
-              <div className="mockup-line"></div>
-              <div className="mockup-line short"></div>
+            <div className="sample-cell">
+              <span>Buyer</span>
+              <strong>DTC operators</strong>
+              <p>Stores doing 200+ monthly orders with support load tied to returns.</p>
+            </div>
+            <div className="sample-cell">
+              <span>Distribution</span>
+              <strong>Shopify forums + SEO</strong>
+              <p>Search intent exists around return portal alternatives and refund automation.</p>
             </div>
           </div>
+          <ul className="report-checks">
+            <li><CheckCircle2 size={15} /> Source links attached to every claim</li>
+            <li><CheckCircle2 size={15} /> MVP scope and first 20 buyer targets included</li>
+            <li><CheckCircle2 size={15} /> GO / PIVOT / KILL decision with risk notes</li>
+          </ul>
         </div>
       </section>
 
@@ -107,11 +129,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ language, onLanguageChange, o
       <section className="social-proof">
         <p>{t('trustedBy')}</p>
         <div className="logo-row">
-          <div className="fake-logo">HackerNews</div>
-          <div className="fake-logo">IndieHackers</div>
-          <div className="fake-logo">Reddit</div>
-          <div className="fake-logo">ProductHunt</div>
-          <div className="fake-logo">V2EX</div>
+          <div className="fake-logo">Reddit RSS</div>
+          <div className="fake-logo">Hacker News</div>
+          <div className="fake-logo">Indie Hackers</div>
+          <div className="fake-logo">Product Hunt</div>
+          <div className="fake-logo">Custom feeds</div>
         </div>
       </section>
 
@@ -128,7 +150,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ language, onLanguageChange, o
           
           <div className="feature-card">
             <div className="feature-icon">
-              <Activity size={20} />
+              <GitBranch size={20} />
             </div>
             <h3>{t('feat2Title')}</h3>
             <p>{t('feat2Desc')}</p>
@@ -173,7 +195,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ language, onLanguageChange, o
         <div className="bottom-cta-box">
           <h2>{t('bottomCtaTitle')}</h2>
           <p>{t('bottomCtaDesc')}</p>
-          <button className="cta-primary" onClick={() => onNavigate('dashboard')}>
+          <button className="cta-primary" onClick={() => onStartValidation(query)}>
             {t('getStarted')}
             <ArrowRight size={16} />
           </button>

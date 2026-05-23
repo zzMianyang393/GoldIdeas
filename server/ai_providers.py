@@ -52,7 +52,7 @@ def generate_openai_compatible_report(opportunity: dict[str, Any], provider: str
         "messages": [
             {
                 "role": "system",
-                "content": "You write concise SaaS opportunity feasibility reports. Return valid JSON only.",
+                "content": "You write evidence-backed SaaS opportunity validation reports. Return valid JSON only.",
             },
             {
                 "role": "user",
@@ -95,9 +95,14 @@ def build_prompt(opportunity: dict[str, Any]) -> str:
     compact = {
         "title": opportunity.get("title"),
         "source": opportunity.get("source"),
+        "sources": opportunity.get("sources"),
         "url": opportunity.get("url"),
         "rating": opportunity.get("rating"),
         "total_score": opportunity.get("total_score"),
+        "evidence_count": opportunity.get("evidence_count"),
+        "source_count": opportunity.get("source_count"),
+        "cluster_keywords": opportunity.get("cluster_keywords"),
+        "representative_signals": opportunity.get("representative_signals"),
         "category": opportunity.get("category"),
         "summary": opportunity.get("content_summary"),
         "scores": opportunity.get("scores"),
@@ -107,11 +112,13 @@ def build_prompt(opportunity: dict[str, Any]) -> str:
         "action_items": opportunity.get("action_items"),
     }
     return (
-        "Create a feasibility report for this SaaS opportunity. "
-        "Return JSON with keys: executive_summary, problem_evidence, audience_icp, "
-        "market_signal, competition, build_feasibility, distribution, monetization, "
-        "risk_assessment, validation_plan, ai_notes. "
-        "Keep values concise and actionable.\n\n"
+        "Create a source-backed SaaS opportunity validation report. "
+        "Use the attached evidence, do not invent sources, and make a clear GO/PIVOT/KILL verdict. "
+        "Return JSON with keys: executive_summary, problem_evidence, audience_icp, market_signal, "
+        "competition, build_feasibility, distribution, monetization, risk_assessment, validation_plan, ai_notes. "
+        "executive_summary must include verdict, total_score, evidence_count, source_count, one_liner, decision_reason. "
+        "problem_evidence must include cluster_keywords, sources, and evidence items. "
+        "validation_plan must include questions and seven_day_plan. Keep values concise and actionable.\n\n"
         + json.dumps(compact, ensure_ascii=False, indent=2)
     )
 

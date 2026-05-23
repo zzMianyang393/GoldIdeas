@@ -45,7 +45,7 @@ const Header: React.FC<HeaderProps> = ({ activeModule, language, setLanguage, t 
           <button className="btn-icon" onClick={toggleLanguage} title="Toggle Language">
             <Globe size={18} />
             <span style={{ fontSize: '0.7rem', fontWeight: 600, marginLeft: '4px' }}>
-              {language === 'en' ? 'EN' : '中'}
+              {language === 'en' ? 'EN' : 'ZH'}
             </span>
           </button>
           <button className="btn-icon">

@@ -188,6 +188,51 @@ REQUEST_PHRASES = ["looking for", "anyone know", "recommend", "can't find", "nee
 PAIN_SIGNALS = ["frustrated", "hate", "waste of time", "pain", "sucks", "terrible"]
 PAY_SIGNALS = ["pay for", "willing to", "willing to pay", "take my money", "would buy"]
 
+CLUSTER_STOPWORDS = {
+    "about",
+    "after",
+    "also",
+    "another",
+    "because",
+    "before",
+    "being",
+    "build",
+    "building",
+    "could",
+    "does",
+    "doing",
+    "from",
+    "have",
+    "help",
+    "into",
+    "just",
+    "like",
+    "looking",
+    "make",
+    "need",
+    "needs",
+    "really",
+    "saas",
+    "should",
+    "some",
+    "that",
+    "their",
+    "there",
+    "thing",
+    "this",
+    "tool",
+    "tools",
+    "using",
+    "want",
+    "what",
+    "when",
+    "where",
+    "which",
+    "with",
+    "work",
+    "would",
+}
+
 CATEGORIES = {
     "pain_point": {
         "keywords": [
@@ -842,9 +887,136 @@ def make_action_items(post: dict[str, Any], rating: str) -> str:
     return "暂不投入开发，只保留关键词用于后续趋势观察。"
 
 
+def cluster_tokens(item: dict[str, Any]) -> set[str]:
+    text = normalize_text(f"{item.get('title', '')} {item.get('content', '')}")
+    tokens: set[str] = set()
+    for token in text.split():
+        if len(token) < 4 or token.isdigit() or token in CLUSTER_STOPWORDS:
+            continue
+        if token.endswith("s") and len(token) > 5:
+            token = token[:-1]
+        tokens.add(token)
+    return tokens
+
+
+def cluster_similarity(left: set[str], right: set[str]) -> float:
+    if not left or not right:
+        return 0.0
+    return len(left & right) / len(left | right)
+
+
+def should_join_cluster(item: dict[str, Any], tokens: set[str], cluster: dict[str, Any]) -> bool:
+    cluster_tokens_value = cluster["tokens"]
+    overlap = len(tokens & cluster_tokens_value)
+    if overlap < 2:
+        return False
+    same_category = item.get("category", {}).get("name") == cluster.get("category")
+    similarity = cluster_similarity(tokens, cluster_tokens_value)
+    return similarity >= 0.34 or (same_category and overlap >= 3) or overlap >= 4
+
+
+def signal_snapshot(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "signal_id": item.get("signal_id"),
+        "title": item.get("title"),
+        "source": item.get("source"),
+        "source_group": item.get("source_group"),
+        "url": item.get("url"),
+        "comments_url": item.get("comments_url"),
+        "comments": item.get("comments") or 0,
+        "published": item.get("published") or "",
+        "content_summary": item.get("content_summary") or "",
+        "content_hash": item.get("content_hash") or "",
+    }
+
+
+def average_scores(items: list[dict[str, Any]]) -> dict[str, float]:
+    dimensions = sorted({dimension for item in items for dimension in item.get("scores", {})})
+    averaged: dict[str, float] = {}
+    for dimension in dimensions:
+        values = [float(item.get("scores", {}).get(dimension) or 0) for item in items]
+        averaged[dimension] = round(sum(values) / len(values), 1)
+    return averaged
+
+
+def merge_score_reasons(items: list[dict[str, Any]], scores: dict[str, float]) -> dict[str, str]:
+    reasons: dict[str, str] = {}
+    for dimension in scores:
+        seen: list[str] = []
+        for item in items:
+            reason = item.get("score_reasons", {}).get(dimension)
+            if reason and reason not in seen:
+                seen.append(reason)
+            if len(seen) >= 2:
+                break
+        reasons[dimension] = " | ".join(seen) if seen else "Cluster-level average across linked evidence."
+    return reasons
+
+
+def build_cluster_item(items: list[dict[str, Any]], tokens: set[str]) -> dict[str, Any]:
+    items = sorted(items, key=lambda item: (item["rating"] != "🟢 GREEN", -item["total_score"], item["title"]))
+    representative = items[0]
+    evidence_count = len(items)
+    source_names = sorted({item.get("source") or "unknown" for item in items})
+    source_groups = sorted({item.get("source_group") or "unknown" for item in items})
+    keywords = sorted(tokens)[:8]
+    cluster_seed = "|".join(
+        [
+            representative.get("category", {}).get("name", "unknown"),
+            "|".join(keywords[:6]),
+        ]
+    )
+    fingerprint = stable_hash(f"cluster|{cluster_seed}", 24)
+    scores = average_scores(items) or representative.get("scores", {})
+    total_score = round(min(max(item["total_score"] for item in items) + min((evidence_count - 1) * 0.2, 1.0), 10.0), 1)
+    redlines = representative.get("redlines", [])
+    rating = calc_rating(total_score, bool(redlines))
+    summary_prefix = f"{evidence_count} related signal(s) across {len(source_names)} source(s)."
+    return {
+        **representative,
+        "fingerprint": fingerprint,
+        "opportunity_id": f"opp_{fingerprint}",
+        "scores": scores,
+        "score_reasons": merge_score_reasons(items, scores),
+        "total_score": total_score,
+        "rating": rating,
+        "content_summary": f"{summary_prefix} Representative evidence: {representative.get('content_summary') or representative.get('title')}",
+        "key_insight": f"Repeated pain pattern found in {evidence_count} signal(s): {', '.join(keywords[:5]) or representative.get('category', {}).get('name', 'market signal')}.",
+        "action_items": "Validate the cluster with 5 direct user conversations, then test a narrow landing page for the highest-intent segment.",
+        "evidence_count": evidence_count,
+        "source_count": len(source_names),
+        "sources": source_names,
+        "source_groups": source_groups,
+        "cluster_keywords": keywords,
+        "representative_signals": [signal_snapshot(item) for item in items],
+        "source": ", ".join(source_names[:3]),
+        "source_group": "multi" if len(source_groups) > 1 else source_groups[0],
+    }
+
+
+def cluster_opportunities(opportunities: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    clusters: list[dict[str, Any]] = []
+    for item in opportunities:
+        tokens = cluster_tokens(item)
+        matched = None
+        for cluster in clusters:
+            if should_join_cluster(item, tokens, cluster):
+                matched = cluster
+                break
+        if matched:
+            matched["items"].append(item)
+            matched["tokens"].update(tokens)
+        else:
+            clusters.append({"category": item.get("category", {}).get("name"), "tokens": set(tokens), "items": [item]})
+    clustered = [build_cluster_item(cluster["items"], cluster["tokens"]) for cluster in clusters]
+    clustered.sort(key=lambda item: (item["rating"] != "🟢 GREEN", -int(item.get("evidence_count") or 1), -item["total_score"], item["title"]))
+    return clustered
+
+
 def analyze_posts(posts: list[dict[str, Any]], rating_filter: str | None = None, quick: bool = False, opportunity_type: str = "micro_saas") -> list[dict[str, Any]]:
     opportunities = [analyze_post(post, opportunity_type=opportunity_type) for post in posts]
-    opportunities.sort(key=lambda item: (item["rating"] != "🟢 GREEN", -item["total_score"], item["title"]))
+    opportunities = cluster_opportunities(opportunities)
+    opportunities.sort(key=lambda item: (item["rating"] != "🟢 GREEN", -int(item.get("evidence_count") or 1), -item["total_score"], item["title"]))
     if rating_filter:
         wanted = rating_filter.lower()
         opportunities = [item for item in opportunities if wanted in item["rating"].lower()]

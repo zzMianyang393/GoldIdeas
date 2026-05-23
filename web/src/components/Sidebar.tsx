@@ -6,7 +6,9 @@ import {
   Database, 
   PlaySquare, 
   Settings,
-  Hexagon
+  Hexagon,
+  Users,
+  Globe2
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -21,6 +23,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeModule, setActiveModule, t }) =
     { id: 'signals', label: t('signals'), icon: Activity },
     { id: 'opportunities', label: t('opportunities'), icon: Lightbulb },
     { id: 'reports', label: t('reports'), icon: FileText },
+    { id: 'publicPages', label: t('publicPages'), icon: Globe2 },
+    { id: 'leads', label: t('leads'), icon: Users },
     { id: 'sources', label: t('sources'), icon: Database },
     { id: 'runs', label: t('runs'), icon: PlaySquare },
   ];

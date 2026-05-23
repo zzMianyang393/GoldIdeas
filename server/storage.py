@@ -283,6 +283,18 @@ def init_db(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS waitlist_signups (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            opportunity_id TEXT,
+            public_slug TEXT,
+            query TEXT,
+            source TEXT NOT NULL DEFAULT 'public_opportunity',
+            utm_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            UNIQUE(email, public_slug, query)
+        );
         """
     )
     ensure_column(conn, "search_jobs", "run_id", "TEXT")
@@ -437,14 +449,24 @@ def persist_pipeline_result(result: dict[str, Any]) -> None:
                     dumps(item),
                 ),
             )
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO opportunity_signals (
-                    opportunity_id, signal_id, relation_type, confidence
-                ) VALUES (?, ?, 'primary', 1.0)
-                """,
-                (item["opportunity_id"], item["signal_id"]),
-            )
+            linked_signals = item.get("representative_signals") or [{"signal_id": item["signal_id"]}]
+            for index, linked_signal in enumerate(linked_signals):
+                signal_id = linked_signal.get("signal_id") if isinstance(linked_signal, dict) else linked_signal
+                if not signal_id:
+                    continue
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO opportunity_signals (
+                        opportunity_id, signal_id, relation_type, confidence
+                    ) VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        item["opportunity_id"],
+                        signal_id,
+                        "primary" if index == 0 else "supporting",
+                        1.0 if index == 0 else 0.82,
+                    ),
+                )
             conn.execute(
                 """
                 INSERT INTO scores (
@@ -694,6 +716,123 @@ def row_to_source(row: sqlite3.Row) -> dict[str, Any]:
     data = dict(row)
     data["enabled"] = bool(data["enabled"])
     data["config"] = loads(data.pop("config_json"), {})
+    return data
+
+
+def create_waitlist_signup(payload: dict[str, Any]) -> dict[str, Any]:
+    from demand_pipeline import stable_hash
+
+    if (payload.get("company_name") or payload.get("website") or "").strip():
+        raise ValueError("Unable to save interest right now")
+
+    email = (payload.get("email") or "").strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise ValueError("Valid email is required")
+    timestamp = now_iso()
+    public_slug = (payload.get("public_slug") or payload.get("slug") or "").strip()
+    query = (payload.get("query") or "").strip()
+    opportunity_id = (payload.get("opportunity_id") or "").strip()
+    source = (payload.get("source") or "public_opportunity").strip()
+    seed = dumps({"email": email, "public_slug": public_slug, "query": query})
+    signup_id = f"wl_{stable_hash(seed, 20)}"
+    utm = payload.get("utm") if isinstance(payload.get("utm"), dict) else {}
+
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO waitlist_signups (
+                id, email, opportunity_id, public_slug, query, source, utm_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(email, public_slug, query) DO UPDATE SET
+                opportunity_id = excluded.opportunity_id,
+                source = excluded.source,
+                utm_json = excluded.utm_json
+            """,
+            (
+                signup_id,
+                email,
+                opportunity_id,
+                public_slug,
+                query,
+                source,
+                dumps(utm),
+                timestamp,
+            ),
+        )
+        conn.commit()
+    return get_waitlist_signup(signup_id) or {
+        "id": signup_id,
+        "email": email,
+        "opportunity_id": opportunity_id,
+        "public_slug": public_slug,
+        "query": query,
+        "source": source,
+        "utm": utm,
+        "created_at": timestamp,
+    }
+
+
+def get_waitlist_signup(signup_id: str) -> dict[str, Any] | None:
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM waitlist_signups WHERE id = ?", (signup_id,)).fetchone()
+    return row_to_waitlist_signup(row) if row else None
+
+
+def list_waitlist_signups(limit: int = 50) -> list[dict[str, Any]]:
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM waitlist_signups ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [row_to_waitlist_signup(row) for row in rows]
+
+
+def count_waitlist_signups_by_slug() -> dict[str, int]:
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT public_slug, COUNT(*) AS count
+            FROM waitlist_signups
+            WHERE public_slug != ''
+            GROUP BY public_slug
+            """
+        ).fetchall()
+    return {row["public_slug"]: int(row["count"]) for row in rows}
+
+
+def waitlist_stats() -> dict[str, Any]:
+    with connect() as conn:
+        total_row = conn.execute("SELECT COUNT(*) AS count FROM waitlist_signups").fetchone()
+        slug_rows = conn.execute(
+            """
+            SELECT public_slug, COUNT(*) AS count
+            FROM waitlist_signups
+            WHERE public_slug != ''
+            GROUP BY public_slug
+            ORDER BY count DESC, public_slug
+            LIMIT 10
+            """
+        ).fetchall()
+        source_rows = conn.execute(
+            """
+            SELECT source, COUNT(*) AS count
+            FROM waitlist_signups
+            GROUP BY source
+            ORDER BY count DESC, source
+            LIMIT 10
+            """
+        ).fetchall()
+    return {
+        "total": int(total_row["count"] if total_row else 0),
+        "public_page_count": len(slug_rows),
+        "by_slug": [{"slug": row["public_slug"], "count": int(row["count"])} for row in slug_rows],
+        "by_source": [{"source": row["source"], "count": int(row["count"])} for row in source_rows],
+    }
+
+
+def row_to_waitlist_signup(row: sqlite3.Row) -> dict[str, Any]:
+    data = dict(row)
+    data["utm"] = loads(data.pop("utm_json"), {})
     return data
 
 
