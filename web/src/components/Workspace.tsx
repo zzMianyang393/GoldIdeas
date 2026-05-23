@@ -41,6 +41,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ activeModule, selectedItem, setSe
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState('');
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [scanMeta, setScanMeta] = useState<Record<string, unknown>>({});
   const [waitlist, setWaitlist] = useState<WaitlistSignup[]>([]);
   const [waitlistStats, setWaitlistStats] = useState<WaitlistStats | null>(null);
   const [isLoadingWaitlist, setIsLoadingWaitlist] = useState(false);
@@ -168,6 +169,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ activeModule, selectedItem, setSe
       });
       setOpportunities(result.opportunities || []);
       setCounts(result.counts || {});
+      setScanMeta(result.metadata || {});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Scan failed');
     } finally {
@@ -240,6 +242,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ activeModule, selectedItem, setSe
             {Object.keys(counts).length > 0 && (
               <span className="counts-text">
                 {counts.green || 0} green / {counts.yellow || 0} yellow / {counts.red || 0} red
+              </span>
+            )}
+            {Object.keys(scanMeta).length > 0 && (
+              <span className="counts-text">
+                {Number(scanMeta.source_count || 0)} sources / {Number(scanMeta.raw_count || 0)} raw signals
               </span>
             )}
           </div>

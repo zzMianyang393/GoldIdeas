@@ -28,6 +28,7 @@ from storage import (
     list_search_jobs,
     list_signals,
     list_sources,
+    list_enabled_sources,
     list_waitlist_signups,
     set_source_enabled,
     upsert_source,
@@ -189,6 +190,11 @@ def test_sources_can_be_managed() -> None:
     assert disabled is not None
     assert disabled["enabled"] is False
     assert any(item["id"] == "test_source" for item in list_sources())
+    developer_sources = list_enabled_sources("developer_tools")
+    ecommerce_sources = list_enabled_sources("ecommerce_tools")
+    assert len(developer_sources) >= 8
+    assert len(ecommerce_sources) >= 5
+    assert any(item["source_pack"] == "default" for item in developer_sources)
 
 
 def test_search_job_lifecycle() -> None:

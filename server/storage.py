@@ -69,6 +69,55 @@ DEFAULT_SOURCES = [
         "source_pack": "developer_tools",
     },
     {
+        "id": "reddit_programming",
+        "name": "r/programming",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/programming/.rss",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "reddit_softwareengineering",
+        "name": "r/SoftwareEngineering",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/SoftwareEngineering/.rss",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "reddit_devops",
+        "name": "r/devops",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/devops/.rss",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "reddit_datascience",
+        "name": "r/datascience",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/datascience/.rss",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "reddit_mlops",
+        "name": "r/mlops",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/mlops/.rss",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "reddit_sysadmin",
+        "name": "r/sysadmin",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/sysadmin/.rss",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "reddit_selfhosted",
+        "name": "r/selfhosted",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/selfhosted/.rss",
+        "source_pack": "developer_tools",
+    },
+    {
         "id": "reddit_nocode",
         "name": "r/nocode",
         "type": "reddit_rss",
@@ -80,6 +129,34 @@ DEFAULT_SOURCES = [
         "name": "r/smallbusiness",
         "type": "reddit_rss",
         "url": "https://www.reddit.com/r/smallbusiness/.rss",
+        "source_pack": "micro_saas",
+    },
+    {
+        "id": "reddit_entrepreneur",
+        "name": "r/Entrepreneur",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/Entrepreneur/.rss",
+        "source_pack": "micro_saas",
+    },
+    {
+        "id": "reddit_startups",
+        "name": "r/startups",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/startups/.rss",
+        "source_pack": "micro_saas",
+    },
+    {
+        "id": "reddit_growmybusiness",
+        "name": "r/growmybusiness",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/growmybusiness/.rss",
+        "source_pack": "micro_saas",
+    },
+    {
+        "id": "reddit_marketing",
+        "name": "r/marketing",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/marketing/.rss",
         "source_pack": "micro_saas",
     },
     {
@@ -97,10 +174,52 @@ DEFAULT_SOURCES = [
         "source_pack": "developer_tools",
     },
     {
+        "id": "reddit_shopify",
+        "name": "r/shopify",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/shopify/.rss",
+        "source_pack": "ecommerce_tools",
+    },
+    {
+        "id": "reddit_ecommerce",
+        "name": "r/ecommerce",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/ecommerce/.rss",
+        "source_pack": "ecommerce_tools",
+    },
+    {
+        "id": "reddit_fulfillmentbyamazon",
+        "name": "r/FulfillmentByAmazon",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/FulfillmentByAmazon/.rss",
+        "source_pack": "ecommerce_tools",
+    },
+    {
+        "id": "reddit_etsy",
+        "name": "r/Etsy",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/Etsy/.rss",
+        "source_pack": "ecommerce_tools",
+    },
+    {
+        "id": "reddit_woocommerce",
+        "name": "r/woocommerce",
+        "type": "reddit_rss",
+        "url": "https://www.reddit.com/r/woocommerce/.rss",
+        "source_pack": "ecommerce_tools",
+    },
+    {
         "id": "hackernews_rss",
         "name": "Hacker News",
         "type": "rss",
         "url": "https://hnrss.org/newest?points=10",
+        "source_pack": "default",
+    },
+    {
+        "id": "hackernews_frontpage",
+        "name": "Hacker News Front Page",
+        "type": "rss",
+        "url": "https://hnrss.org/frontpage",
         "source_pack": "default",
     },
     {
@@ -123,6 +242,34 @@ DEFAULT_SOURCES = [
         "type": "rss",
         "url": "https://www.indiehackers.com/feed",
         "source_pack": "micro_saas",
+    },
+    {
+        "id": "lobsters_rss",
+        "name": "Lobsters",
+        "type": "rss",
+        "url": "https://lobste.rs/rss",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "github_trending_rss",
+        "name": "GitHub Trending",
+        "type": "rss",
+        "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "devto_rss",
+        "name": "DEV Community",
+        "type": "rss",
+        "url": "https://dev.to/feed",
+        "source_pack": "developer_tools",
+    },
+    {
+        "id": "shopify_changelog_rss",
+        "name": "Shopify Developer Changelog",
+        "type": "rss",
+        "url": "https://shopify.dev/changelog/feed.xml",
+        "source_pack": "ecommerce_tools",
     },
 ]
 
@@ -315,11 +462,17 @@ def seed_default_sources(conn: sqlite3.Connection) -> None:
     for source in DEFAULT_SOURCES:
         conn.execute(
             """
-            INSERT OR IGNORE INTO sources (
+            INSERT INTO sources (
                 id, name, type, url, enabled, source_pack, config_json,
                 last_status, last_error, last_fetched_at, last_item_count,
                 created_at, updated_at
             ) VALUES (?, ?, ?, ?, 1, ?, '{}', 'unknown', '', '', 0, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                type = excluded.type,
+                url = excluded.url,
+                source_pack = excluded.source_pack,
+                updated_at = excluded.updated_at
             """,
             (
                 source["id"],
